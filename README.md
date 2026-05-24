@@ -39,11 +39,77 @@ Open http://localhost:3000 in your browser.
 3. **End the session** when you think you have enough info
 4. **Get scored** on your diagnostic performance
 
-## Tech Stack
-- Next.js 14 (App Router)
-- TypeScript
-- Tailwind CSS
-- Anthropic Claude API
+## Project Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                     BROWSER (Client)                     │
+│                                                         │
+│   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐  │
+│   │  Home Page  │   │  Chat Page  │   │  Feedback   │  │
+│   │ (Disease    │──▶│ (Chat UI +  │──▶│   Modal     │  │
+│   │  Selection) │   │  Messages)  │   │  (Scores)   │  │
+│   └─────────────┘   └──────┬──────┘   └─────────────┘  │
+└──────────────────────────── │ ────────────────────────────┘
+                              │ HTTP POST
+                              ▼
+┌─────────────────────────────────────────────────────────┐
+│              NEXT.JS SERVER (Vercel Serverless)          │
+│                                                         │
+│   ┌──────────────────┐     ┌──────────────────────┐    │
+│   │  /api/chat       │     │  /api/feedback        │    │
+│   │                  │     │                       │    │
+│   │  - Gets disease  │     │  - Gets conversation  │    │
+│   │    system prompt │     │  - Prompts AI to      │    │
+│   │  - Sends to AI   │     │    evaluate & score   │    │
+│   │  - Returns reply │     │  - Returns JSON score  │    │
+│   └────────┬─────────┘     └──────────┬────────────┘    │
+└────────────│──────────────────────────│─────────────────┘
+             │ Anthropic SDK            │ Anthropic SDK
+             ▼                          ▼
+┌─────────────────────────────────────────────────────────┐
+│                  ANTHROPIC CLAUDE API                    │
+│                                                         │
+│   ┌──────────────────────────────────────────────────┐  │
+│   │  Claude Haiku Model                              │  │
+│   │  - Simulates patient with disease system prompt  │  │
+│   │  - Evaluates doctor performance as JSON          │  │
+│   └──────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Data Flow
+
+```
+Student types question
+        │
+        ▼
+Browser sends: { diseaseId, messages[] }
+        │
+        ▼
+/api/chat retrieves disease system prompt from diseases.ts
+        │
+        ▼
+Claude API receives: system prompt + full conversation history
+        │
+        ▼
+Claude generates patient response (constrained by persona)
+        │
+        ▼
+Response displayed in chat UI
+        │
+        ▼
+Student clicks End Session
+        │
+        ▼
+/api/feedback sends full conversation to Claude for evaluation
+        │
+        ▼
+Claude returns structured JSON: { score, symptoms, feedback }
+        │
+        ▼
+FeedbackModal displays performance report
+```
 
 ## Project Structure
 ```
@@ -57,3 +123,15 @@ components/
 lib/
   diseases.ts           — Disease data & patient prompts
 ```
+
+## Tech Stack
+- Next.js 14 (App Router)
+- TypeScript
+- Tailwind CSS
+- Anthropic Claude API
+
+## Environment Variables
+```
+ANTHROPIC_API_KEY=your_key_here
+```
+Never commit this to GitHub. Add to `.env.local` for local dev and Vercel environment variables for production.
